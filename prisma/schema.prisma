@@ -1,0 +1,208 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("MONGODB_URI")
+}
+
+model User {
+  id                 String  @id @default(auto()) @map("_id") @db.ObjectId
+  email              String  @unique
+  name               String
+  password           String
+  onboardingComplete Boolean @default(false)
+
+  // API Keys (encrypted)
+  encryptedGeminiKey String? // User's personal Gemini API key (encrypted with salt)
+
+  // Onboarding data
+  homeCity             String?
+  homeCountry          String?
+  travelStyle          String? // relaxed, balanced, intense
+  budgetComfort        String? // low, mid, high
+  accommodationStyle   String?
+  transportPreferences String?
+  emotionalBaseline    Json? // stress triggers, preferred pace, social vs solo
+
+  // Preferences
+  preferences  Json?
+  personality  Json?
+  baselineMood String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  trips          Trip[]
+  moodEvents     MoodEvent[]
+  habitPatterns  HabitPattern[]
+  journalEntries JournalEntry[]
+}
+
+model Trip {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title           String
+  destinationCity String
+  country         String
+  startDate       DateTime
+  endDate         DateTime
+  budget          Float
+  currency        String  @default("USD")
+  travelMode      String? // flight, train, bus, car, ship, other
+  preferences     Json? // pace, interests, food prefs, etc.
+
+  // Geo-location data
+  latitude       Float?
+  longitude      Float?
+  cityType       String?
+  population     Int?
+  externalCityId String?
+  
+  // Context Data
+  famousPlaces   Json? // Stores fetched places from OpenTripMap (attractions, cafes, etc.)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  itineraries    Itinerary[]
+  expenses       Expense[]
+  weatherEvents  WeatherEvent[]
+  journalEntries JournalEntry[]
+  moodEvents     MoodEvent[]
+}
+
+model Itinerary {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  tripId String @db.ObjectId
+  trip   Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  rawAIResponse Json
+  summary       String
+  totalDays     Int
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  dayPlans DayPlan[]
+}
+
+model DayPlan {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  itineraryId String    @db.ObjectId
+  itinerary   Itinerary @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+
+  date            DateTime
+  dayIndex        Int
+  activities      Json // ordered list with times, locations, categories, estimated costs
+  routeInfo       Json? // polyline/coordinates, totalDistance, totalTime
+  moodAdjustments Json? // adjustments made based on mood
+
+  // Relations
+  moodEvents     MoodEvent[]
+  expenses       Expense[]
+  weatherEvents  WeatherEvent[]
+  journalEntries JournalEntry[]
+
+  @@index([itineraryId, dayIndex])
+}
+
+model MoodEvent {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tripId String? @db.ObjectId
+  trip   Trip?   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  dayPlanId String?  @db.ObjectId
+  dayPlan   DayPlan? @relation(fields: [dayPlanId], references: [id], onDelete: Cascade)
+
+  timestamp DateTime @default(now())
+
+  // Behavioral metrics
+  metrics Json // typingSpeed, scrollVelocity, clickHesitation, editFrequency, keyHesitationPattern
+
+  // AI inference
+  inferredEmotion String // stressed, excited, bored, overwhelmed, neutral
+  appliedChanges  Json? // what was changed in itinerary
+
+  @@index([userId, timestamp])
+}
+
+model HabitPattern {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @unique @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Learned patterns
+  learnedWakeTimeDistribution Json? // distribution of actual wake times
+  walkingToleranceStats       Json? // max distance, average comfort level
+  cuisinePreferences          Json? // preferred cuisines, price ranges, meal times
+  budgetBehavior              Json? // overspending patterns, category preferences
+
+  lastUpdated DateTime @updatedAt
+}
+
+model Expense {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  tripId String @db.ObjectId
+  trip   Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  dayPlanId String?  @db.ObjectId
+  dayPlan   DayPlan? @relation(fields: [dayPlanId], references: [id], onDelete: SetNull)
+
+  category  String // food, transport, attractions, shopping, misc
+  amount    Float
+  currency  String   @default("USD")
+  timestamp DateTime @default(now())
+  note      String?
+
+  @@index([tripId, category])
+  @@index([tripId, timestamp])
+}
+
+model WeatherEvent {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  tripId String @db.ObjectId
+  trip   Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  dayPlanId String?  @db.ObjectId
+  dayPlan   DayPlan? @relation(fields: [dayPlanId], references: [id], onDelete: SetNull)
+
+  datetime    DateTime
+  location    Json // lat, lng, name
+  weatherType String // rain, heat, snow, clear, etc.
+  temperature Float
+  severity    String? // low, medium, high
+
+  aiAdjustments Json? // changes requested to itinerary
+
+  @@index([tripId, datetime])
+}
+
+model JournalEntry {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tripId String @db.ObjectId
+  trip   Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  dayPlanId String?  @db.ObjectId
+  dayPlan   DayPlan? @relation(fields: [dayPlanId], references: [id], onDelete: SetNull)
+
+  content   String
+  aiSummary String?
+  moodTag   String? // sentiment
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, tripId])
+  @@index([tripId, createdAt])
+}
