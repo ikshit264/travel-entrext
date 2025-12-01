@@ -212,27 +212,6 @@ function EditProfileContent() {
                         </CardContent>
                     </Card>
 
-                    {/* Location */}
-                    {/* <Card className="bg-white/80 backdrop-blur-sm">
-                        <CardHeader className="p-4 sm:p-6">
-                            <div className="flex items-center gap-2">
-                                <MapPin className="h-5 w-5 text-primary" />
-                                <CardTitle className="text-lg sm:text-xl">Location</CardTitle>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="p-4 sm:p-6 space-y-4">
-                            <div className="space-y-2">
-                                <Label>Home City</Label>
-                                <LocationSelector
-                                    countryValue={formData.homeCountry}
-                                    cityValue={formData.homeCity}
-                                    onCountryChange={(country) => setFormData({ ...formData, homeCountry: country })}
-                                    onCityChange={(city) => setFormData({ ...formData, homeCity: city })}
-                                />
-                            </div>
-                        </CardContent>
-                    </Card> */}
-
                     {/* Travel Preferences */}
                     <Card className="bg-white/80 backdrop-blur-sm">
                         <CardHeader className="p-4 sm:p-6">
