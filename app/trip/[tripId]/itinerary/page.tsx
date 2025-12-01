@@ -12,14 +12,16 @@ import { DayChatDialog } from "@/components/itinerary/DayChatDialog";
 import { WeatherData } from "@/lib/weather";
 import { fetchForecast } from "@/app/actions/weather";
 import { WeatherBadge } from "@/components/weather/WeatherBadge";
+import { TripLoader } from "@/components/ui/TripLoader";
 
 export default function ItineraryPage() {
     const router = useRouter();
     const params = useParams();
     const tripId = params.tripId as string;
-    const { trip, loading } = useTrip(tripId);
+    const { trip, loading, generateItinerary } = useTrip(tripId);
     const [selectedDay, setSelectedDay] = useState<string | null>(null);
     const [forecast, setForecast] = useState<WeatherData[]>([]);
+    const [isGenerating, setIsGenerating] = useState(false);
 
 
 
@@ -36,13 +38,48 @@ export default function ItineraryPage() {
     if (!trip || !trip.itineraries || trip.itineraries.length === 0) {
         return (
             <div className="min-h-screen flex items-center justify-center">
-                <Card className="max-w-md">
+                {isGenerating && <TripLoader />}
+                <Card className="max-w-md w-full mx-4">
                     <CardHeader>
                         <CardTitle>No Itinerary Yet</CardTitle>
                         <CardDescription>Generate an itinerary for this trip</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                        <Button onClick={() => router.push(`/trip/${tripId}`)}>
+                    <CardContent className="space-y-4">
+                        <Button
+                            onClick={async () => {
+                                setIsGenerating(true);
+                                try {
+                                    // 1. Fetch Famous Places (Context for AI)
+                                    if (trip.latitude && trip.longitude) {
+                                        try {
+                                            await fetch("/api/places/fetch-favorites", {
+                                                method: "POST",
+                                                headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({
+                                                    tripId: trip.id,
+                                                    latitude: trip.latitude,
+                                                    longitude: trip.longitude,
+                                                }),
+                                            });
+                                        } catch (placeError) {
+                                            console.error("Failed to fetch famous places (non-fatal):", placeError);
+                                        }
+                                    }
+
+                                    // 2. Generate Itinerary
+                                    await generateItinerary(tripId);
+                                    window.location.reload();
+                                } catch (error) {
+                                    console.error("Failed to generate itinerary:", error);
+                                    setIsGenerating(false);
+                                }
+                            }}
+                            className="w-full"
+                            disabled={isGenerating}
+                        >
+                            {isGenerating ? "Generating..." : "Regenerate Itinerary"}
+                        </Button>
+                        <Button onClick={() => router.push(`/trip/${tripId}`)} variant="outline" className="w-full">
                             Go Back
                         </Button>
                     </CardContent>
